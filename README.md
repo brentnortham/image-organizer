@@ -46,6 +46,34 @@ Preview what changes would be made without actually moving files:
 python main.py --source F:\Source --destination F:\Destination --dry-run
 ```
 
+With audit file (save full file list for review):
+
+```bash
+python main.py --source F:\Source --destination F:\Destination --dry-run --audit-file audit.txt
+```
+
+### Live Operation (Move Files)
+
+After analysis completes, a preview file (`PREVIEW_FILE.txt`) is automatically generated in the destination folder. You'll be prompted to review it and confirm before any files are moved:
+
+```bash
+python main.py --source F:\Source --destination F:\Destination
+```
+
+With audit file:
+
+```bash
+python main.py --source F:\Source --destination F:\Destination --audit-file audit.txt
+```
+
+### Copy Files (Non-Destructive)
+
+Copy files instead of moving them (preserves originals):
+
+```bash
+python main.py --source F:\Source --destination F:\Destination --copy
+```
+
 ### Verbose Output
 
 Enable detailed logging:
@@ -62,6 +90,8 @@ python main.py --source F:\Source --destination F:\Destination --verbose
 - `--verbose` / `-v` (flag): Enable verbose output
 - `--workers` (optional): Number of parallel workers for photo analysis (default: number of CPU cores)
 - `--skip-filename-similarity` (flag): Skip filename similarity detection (faster for large datasets, may miss some duplicates)
+- `--copy` (flag): Copy files instead of moving them (preserves originals in source folder)
+- `--audit-file` (optional): Save full file list to specified file (useful for dry-run audit)
 
 ## How It Works
 
@@ -95,6 +125,13 @@ Destination/
   - Uses multiprocessing for parallel photo analysis (defaults to number of CPU cores)
   - Content hashing is memory-efficient (processes files in chunks)
   - Filename similarity detection is automatically skipped for large datasets (>5000 photos)
+- **Safety**:
+  - In live mode (non-dry-run), a preview file is automatically generated and you must confirm before files are moved/copied
+  - Use `--dry-run` first to preview changes without any file operations
+  - Use `--copy` to preserve originals (slower but safer)
+- **File Operations**:
+  - Default: **Moves** files (removes from source) - faster but destructive
+  - With `--copy`: **Copies** files (preserves originals) - slower but safer
 - **Error Handling**: Corrupted files or files without EXIF data are handled gracefully
 - **Uniqueness**: Filenames are automatically made unique if conflicts occur (adds `_001`, `_002`, etc.)
 - **Platform Support**: Tested on Windows and Linux (WSL). Works on macOS as well.
