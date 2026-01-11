@@ -2,6 +2,7 @@
 
 import sys
 import os
+import shutil
 from pathlib import Path
 from typing import Optional
 import logging
@@ -64,7 +65,7 @@ def print_statistics(
     print("="*60 + "\n")
 
 
-def preview_changes(photos_to_paths: dict, source_root: Path, destination_root: Path, max_preview: int = 50):
+def preview_changes(photos_to_paths: dict, source_root: Path, destination_root: Path, max_preview: int = 50, audit_file: Optional[Path] = None):
     """Preview what changes would be made (for dry-run mode)."""
     print("\n" + "="*60)
     print("PREVIEW (DRY-RUN MODE - No files will be moved)")
@@ -80,6 +81,25 @@ def preview_changes(photos_to_paths: dict, source_root: Path, destination_root: 
     if len(photos_to_paths) > max_preview:
         remaining = len(photos_to_paths) - max_preview
         print(f"\n  ... and {remaining:,} more files")
+
+    # Write audit file if requested
+    if audit_file:
+        try:
+            with open(audit_file, 'w', encoding='utf-8') as f:
+                f.write(f"Image Organizer Audit Log\n")
+                f.write(f"{'='*60}\n")
+                f.write(f"Total files: {len(photos_to_paths):,}\n")
+                f.write(f"{'='*60}\n\n")
+
+                # Write all files
+                for metadata, dest_path in photos_to_paths.items():
+                    source_rel = metadata.file_path.relative_to(source_root)
+                    dest_rel = dest_path.relative_to(destination_root)
+                    f.write(f"{source_rel}  ->  {dest_rel}\n")
+
+            print(f"\n  Full file list saved to: {audit_file}")
+        except Exception as e:
+            logger.warning(f"Failed to write audit file: {e}")
 
     print("="*60 + "\n")
 
@@ -122,7 +142,19 @@ def preview_changes(photos_to_paths: dict, source_root: Path, destination_root: 
     default=None,
     help='Number of parallel workers for photo analysis (default: number of CPU cores)'
 )
-def main(source: Path, destination: Path, dry_run: bool, verbose: bool, skip_filename_similarity: bool, workers: Optional[int]):
+@click.option(
+    '--copy',
+    is_flag=True,
+    default=False,
+    help='Copy files instead of moving them (preserves originals in source folder)'
+)
+@click.option(
+    '--audit-file',
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help='Save full file list to specified file (useful for dry-run audit)'
+)
+def main(source: Path, destination: Path, dry_run: bool, verbose: bool, skip_filename_similarity: bool, workers: Optional[int], copy: bool, audit_file: Optional[Path]):
     """
     Image Organizer Tool - Organize photos by detecting duplicates and organizing by date.
 
@@ -136,7 +168,10 @@ def main(source: Path, destination: Path, dry_run: bool, verbose: bool, skip_fil
     print("="*60)
     print(f"Source:      {source}")
     print(f"Destination: {destination}")
-    print(f"Mode:        {'DRY-RUN (preview only)' if dry_run else 'LIVE (will move files)'}")
+    if dry_run:
+        print(f"Mode:        DRY-RUN (preview only)")
+    else:
+        print(f"Mode:        LIVE ({'copy' if copy else 'move'} files)")
     print("="*60 + "\n")
 
     try:
@@ -212,11 +247,12 @@ def main(source: Path, destination: Path, dry_run: bool, verbose: bool, skip_fil
 
         # Preview or execute
         if dry_run:
-            preview_changes(photos_to_paths, source, destination)
-            print("Dry-run complete. Use without --dry-run to actually move files.")
+            preview_changes(photos_to_paths, source, destination, audit_file=audit_file)
+            print("Dry-run complete. Use without --dry-run to actually move/copy files.")
         else:
-            # Step 7: Move files
-            print("Step 7: Moving files to destination...")
+            # Step 7: Move or copy files
+            operation = "copying" if copy else "moving"
+            print(f"Step 7: {operation.capitalize()} files to destination...")
 
             # Create destination directories
             directories_to_create = set()
@@ -226,24 +262,28 @@ def main(source: Path, destination: Path, dry_run: bool, verbose: bool, skip_fil
             for dir_path in tqdm(directories_to_create, desc="Creating directories", unit="dir"):
                 dir_path.mkdir(parents=True, exist_ok=True)
 
-            # Move files
-            moved_count = 0
+            # Move or copy files
+            processed_count = 0
             error_count = 0
 
-            for metadata, dest_path in tqdm(photos_to_paths.items(), desc="Moving files", unit="file"):
+            for metadata, dest_path in tqdm(photos_to_paths.items(), desc=f"{operation.capitalize()} files", unit="file"):
                 try:
                     # Create parent directory if needed
                     dest_path.parent.mkdir(parents=True, exist_ok=True)
 
-                    # Move file
-                    metadata.file_path.replace(dest_path)
-                    moved_count += 1
+                    # Copy or move file
+                    if copy:
+                        shutil.copy2(metadata.file_path, dest_path)
+                    else:
+                        metadata.file_path.replace(dest_path)
+                    processed_count += 1
 
                 except Exception as e:
-                    logger.error(f"Failed to move {metadata.file_path} to {dest_path}: {e}")
+                    logger.error(f"Failed to {operation} {metadata.file_path} to {dest_path}: {e}")
                     error_count += 1
 
-            print(f"\nCompleted: {moved_count:,} files moved, {error_count:,} errors")
+            operation_past = "copied" if copy else "moved"
+            print(f"\nCompleted: {processed_count:,} files {operation_past}, {error_count:,} errors")
             if error_count > 0:
                 print("Check the log for details on errors.")
 
