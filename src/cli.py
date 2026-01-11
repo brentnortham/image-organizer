@@ -1,9 +1,11 @@
 """CLI interface module - command-line arguments and user interaction."""
 
 import sys
+import os
 from pathlib import Path
 from typing import Optional
 import logging
+from multiprocessing import Pool, cpu_count
 
 import click
 from tqdm import tqdm
@@ -16,6 +18,19 @@ from src.organizer import organize_by_date
 from src.namer import generate_names
 
 logger = logging.getLogger(__name__)
+
+
+def _analyze_photo_wrapper(file_path: Path):
+    """
+    Wrapper function for analyze_photo to handle errors in multiprocessing.
+
+    Returns None if analysis fails, otherwise returns PhotoMetadata object.
+    """
+    try:
+        return analyze_photo(file_path)
+    except Exception as e:
+        logger.error(f"Failed to analyze {file_path}: {e}")
+        return None
 
 
 def setup_logging(verbose: bool = False):
@@ -101,7 +116,13 @@ def preview_changes(photos_to_paths: dict, source_root: Path, destination_root: 
     default=False,
     help='Skip filename similarity detection (much faster for large datasets, but may miss some duplicates)'
 )
-def main(source: Path, destination: Path, dry_run: bool, verbose: bool, skip_filename_similarity: bool):
+@click.option(
+    '--workers',
+    type=int,
+    default=None,
+    help='Number of parallel workers for photo analysis (default: number of CPU cores)'
+)
+def main(source: Path, destination: Path, dry_run: bool, verbose: bool, skip_filename_similarity: bool, workers: Optional[int]):
     """
     Image Organizer Tool - Organize photos by detecting duplicates and organizing by date.
 
@@ -130,14 +151,35 @@ def main(source: Path, destination: Path, dry_run: bool, verbose: bool, skip_fil
 
         # Step 2: Analyze photos
         print("Step 2: Analyzing photos (extracting metadata, calculating hashes)...")
+
+        # Determine number of workers
+        if workers is None:
+            workers = cpu_count()
+
+        # Use multiprocessing for parallel analysis
         photos = []
-        for file_path in tqdm(image_files, desc="Analyzing", unit="photo"):
-            try:
-                metadata = analyze_photo(file_path)
-                photos.append(metadata)
-            except Exception as e:
-                logger.error(f"Failed to analyze {file_path}: {e}")
-                continue
+        if workers > 1 and len(image_files) > 10:  # Only use multiprocessing for larger datasets
+            print(f"  Using {workers} parallel workers...")
+            with Pool(processes=workers) as pool:
+                # Use imap for progress bar support
+                results = list(tqdm(
+                    pool.imap(_analyze_photo_wrapper, image_files),
+                    total=len(image_files),
+                    desc="Analyzing",
+                    unit="photo"
+                ))
+            # Filter out None results (failed analyses)
+            photos = [r for r in results if r is not None]
+        else:
+            # Sequential processing for small datasets or single worker
+            for file_path in tqdm(image_files, desc="Analyzing", unit="photo"):
+                try:
+                    metadata = analyze_photo(file_path)
+                    photos.append(metadata)
+                except Exception as e:
+                    logger.error(f"Failed to analyze {file_path}: {e}")
+                    continue
+
         print(f"Successfully analyzed {len(photos):,} photos\n")
 
         # Step 3: Detect duplicates
