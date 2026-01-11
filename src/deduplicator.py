@@ -145,7 +145,7 @@ def group_by_filename_similarity(photos: List[PhotoMetadata]) -> Dict[str, List[
     return {k: v for k, v in groups.items() if len(v) > 1}
 
 
-def detect_duplicates(photos: List[PhotoMetadata]) -> Dict[str, List[PhotoMetadata]]:
+def detect_duplicates(photos: List[PhotoMetadata], skip_filename_similarity: bool = False) -> Dict[str, List[PhotoMetadata]]:
     """
     Detect duplicate photos using multiple methods.
 
@@ -154,6 +154,7 @@ def detect_duplicates(photos: List[PhotoMetadata]) -> Dict[str, List[PhotoMetada
 
     Args:
         photos: List of PhotoMetadata objects
+        skip_filename_similarity: If True, skip filename similarity detection (much faster for large datasets)
 
     Returns:
         Dictionary mapping group IDs to lists of duplicate photos
@@ -185,19 +186,22 @@ def detect_duplicates(photos: List[PhotoMetadata]) -> Dict[str, List[PhotoMetada
                 duplicate_groups[f"exif_{group_id_counter}"] = ungrouped
                 logger.debug(f"Found {len(ungrouped)} potential duplicates by EXIF date-time")
 
-    # Method 3: Group by filename similarity
-    # Only for photos not already grouped
-    already_grouped_paths = set()
-    for group in duplicate_groups.values():
-        already_grouped_paths.update(p.file_path for p in group)
+    # Method 3: Group by filename similarity (skip if requested or dataset is very large)
+    if not skip_filename_similarity:
+        # Only for photos not already grouped
+        already_grouped_paths = set()
+        for group in duplicate_groups.values():
+            already_grouped_paths.update(p.file_path for p in group)
 
-    ungrouped_photos = [p for p in photos if p.file_path not in already_grouped_paths]
-    filename_groups = group_by_filename_similarity(ungrouped_photos)
-    for key, group in filename_groups.items():
-        if len(group) > 1:
-            group_id_counter += 1
-            duplicate_groups[f"filename_{group_id_counter}"] = group
-            logger.debug(f"Found {len(group)} potential duplicates by filename similarity")
+        ungrouped_photos = [p for p in photos if p.file_path not in already_grouped_paths]
+        filename_groups = group_by_filename_similarity(ungrouped_photos)
+        for key, group in filename_groups.items():
+            if len(group) > 1:
+                group_id_counter += 1
+                duplicate_groups[f"filename_{group_id_counter}"] = group
+                logger.debug(f"Found {len(group)} potential duplicates by filename similarity")
+    else:
+        logger.info("Skipping filename similarity detection for performance")
 
     logger.info(f"Detected {len(duplicate_groups)} duplicate groups")
     return duplicate_groups

@@ -95,7 +95,13 @@ def preview_changes(photos_to_paths: dict, source_root: Path, destination_root: 
     default=False,
     help='Enable verbose output'
 )
-def main(source: Path, destination: Path, dry_run: bool, verbose: bool):
+@click.option(
+    '--skip-filename-similarity',
+    is_flag=True,
+    default=False,
+    help='Skip filename similarity detection (much faster for large datasets, but may miss some duplicates)'
+)
+def main(source: Path, destination: Path, dry_run: bool, verbose: bool, skip_filename_similarity: bool):
     """
     Image Organizer Tool - Organize photos by detecting duplicates and organizing by date.
 
@@ -136,7 +142,11 @@ def main(source: Path, destination: Path, dry_run: bool, verbose: bool):
 
         # Step 3: Detect duplicates
         print("Step 3: Detecting duplicates...")
-        duplicate_groups = detect_duplicates(photos)
+        # Auto-skip filename similarity for very large datasets (>5000 photos) for performance
+        if not skip_filename_similarity and len(photos) > 5000:
+            print(f"  Large dataset detected ({len(photos):,} photos). Skipping filename similarity detection for performance.")
+            skip_filename_similarity = True
+        duplicate_groups = detect_duplicates(photos, skip_filename_similarity=skip_filename_similarity)
         print(f"Found {len(duplicate_groups):,} duplicate groups\n")
 
         # Step 4: Select unique photos
