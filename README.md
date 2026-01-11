@@ -2,6 +2,10 @@
 
 A Python CLI tool that intelligently organizes photos by detecting duplicates, preserving the best quality copies, and organizing them by date with meaningful filenames.
 
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
 ## Features
 
 - **Duplicate Detection**: Uses multiple methods to detect duplicates:
