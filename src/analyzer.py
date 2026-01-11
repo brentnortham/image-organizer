@@ -7,7 +7,7 @@ from typing import Dict, Optional, Any
 import logging
 
 from PIL import Image
-from PIL.ExifTags import TAGS, DATETIME
+from PIL.ExifTags import TAGS
 import pillow_heif
 
 # Register HEIF opener with Pillow

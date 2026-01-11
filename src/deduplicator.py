@@ -1,9 +1,9 @@
 """Duplicate detection module - groups photos by content hash, EXIF date, filename similarity, etc."""
 
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 import logging
 import re
 

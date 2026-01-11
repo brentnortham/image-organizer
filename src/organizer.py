@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Union, Set, List
+from typing import Dict
 import logging
 
 from src.analyzer import PhotoMetadata
