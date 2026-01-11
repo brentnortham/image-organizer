@@ -25,6 +25,7 @@ class PhotoMetadata:
         self.mtime = file_path.stat().st_mtime
         self.content_hash: Optional[str] = None
         self.exif_data: Dict[str, Any] = {}
+        self.exif_field_count: int = 0  # Store count separately for memory efficiency
         self.date_taken: Optional[datetime] = None
         self.camera_make: Optional[str] = None
         self.camera_model: Optional[str] = None
@@ -150,6 +151,7 @@ def analyze_photo(file_path: Path) -> PhotoMetadata:
         with Image.open(file_path) as image:
             # Get EXIF data
             metadata.exif_data = extract_exif_metadata(image)
+            metadata.exif_field_count = len(metadata.exif_data)
 
             # Extract date taken (try multiple EXIF date fields)
             for date_key in metadata.exif_date_keys:
@@ -163,6 +165,10 @@ def analyze_photo(file_path: Path) -> PhotoMetadata:
             # Extract camera info
             metadata.camera_make = metadata.exif_data.get('Make')
             metadata.camera_model = metadata.exif_data.get('Model')
+
+            # Clear EXIF data dictionary after extracting needed fields to reduce memory usage
+            # We only need the count for quality selection, not the full dictionary
+            metadata.exif_data.clear()
 
     except Exception as e:
         logger.warning(f"Error analyzing image {file_path}: {e}")

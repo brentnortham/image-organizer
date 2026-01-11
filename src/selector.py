@@ -20,7 +20,8 @@ def count_exif_fields(metadata: PhotoMetadata) -> int:
     Returns:
         Number of EXIF fields
     """
-    return len(metadata.exif_data)
+    # Use stored count for memory efficiency (exif_data is cleared after extraction)
+    return metadata.exif_field_count
 
 
 def select_best_photo(photos: List[PhotoMetadata]) -> PhotoMetadata:
