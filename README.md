@@ -17,7 +17,7 @@ A Python CLI tool that intelligently organizes photos by detecting duplicates, p
 ## Requirements
 
 - Python 3.9+
-- Windows (tested), but should work on other platforms
+- Windows, Linux (including WSL), or macOS
 
 ## Installation
 
@@ -56,6 +56,8 @@ python main.py --source F:\Source --destination F:\Destination --verbose
 - `--destination` (required): Destination folder for organized photos
 - `--dry-run` (flag): Preview changes without moving files
 - `--verbose` / `-v` (flag): Enable verbose output
+- `--workers` (optional): Number of parallel workers for photo analysis (default: number of CPU cores)
+- `--skip-filename-similarity` (flag): Skip filename similarity detection (faster for large datasets, may miss some duplicates)
 
 ## How It Works
 
@@ -84,10 +86,14 @@ Destination/
 
 ## Notes
 
-- **HEIC Support**: Requires `pillow-heif`. On Windows, you may need additional system libraries.
-- **Performance**: Content hashing is memory-efficient (processes files in chunks)
+- **HEIC Support**: Requires `pillow-heif`. On Linux, install `libheif-dev` system library. On Windows, additional system libraries may be needed.
+- **Performance**:
+  - Uses multiprocessing for parallel photo analysis (defaults to number of CPU cores)
+  - Content hashing is memory-efficient (processes files in chunks)
+  - Filename similarity detection is automatically skipped for large datasets (>5000 photos)
 - **Error Handling**: Corrupted files or files without EXIF data are handled gracefully
 - **Uniqueness**: Filenames are automatically made unique if conflicts occur (adds `_001`, `_002`, etc.)
+- **Platform Support**: Tested on Windows and Linux (WSL). Works on macOS as well.
 
 ## Example Output
 
