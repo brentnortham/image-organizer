@@ -149,6 +149,9 @@ Desktop.ini
 # test_images/
 # sample_images/
 
+# Cursor IDE files
+.cursor/
+
 # Temporary files
 *.tmp
 *.temp
