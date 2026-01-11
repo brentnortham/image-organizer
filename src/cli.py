@@ -104,6 +104,49 @@ def preview_changes(photos_to_paths: dict, source_root: Path, destination_root: 
     print("="*60 + "\n")
 
 
+def write_preview_file(photos_to_paths: dict, source_root: Path, destination_root: Path, preview_file: Path, operation: str):
+    """Write preview file showing what will happen."""
+    try:
+        with open(preview_file, 'w', encoding='utf-8') as f:
+            f.write(f"Image Organizer Preview - Files to be {operation}d\n")
+            f.write(f"{'='*60}\n")
+            f.write(f"Total files: {len(photos_to_paths):,}\n")
+            f.write(f"Operation: {operation}\n")
+            f.write(f"{'='*60}\n\n")
+
+            # Write all files
+            for metadata, dest_path in photos_to_paths.items():
+                source_rel = metadata.file_path.relative_to(source_root)
+                dest_rel = dest_path.relative_to(destination_root)
+                f.write(f"{source_rel}  ->  {dest_rel}\n")
+
+        return True
+    except Exception as e:
+        logger.error(f"Failed to write preview file: {e}")
+        return False
+
+
+def confirm_proceed(preview_file: Path, copy_mode: bool) -> bool:
+    """Prompt user to confirm before proceeding."""
+    print("\n" + "="*60)
+    print("CONFIRMATION REQUIRED")
+    print("="*60)
+    print(f"A preview file has been generated: {preview_file}")
+    print(f"Please review the file to see what will happen.")
+    operation = "COPY" if copy_mode else "MOVE"
+    print(f"\nThis will {operation} files from source to destination.")
+    print("="*60)
+
+    while True:
+        response = input("\nDo you want to proceed? (yes/no): ").strip().lower()
+        if response in ['yes', 'y']:
+            return True
+        elif response in ['no', 'n']:
+            return False
+        else:
+            print("Please enter 'yes' or 'no'")
+
+
 @click.command()
 @click.option(
     '--source',
@@ -250,6 +293,22 @@ def main(source: Path, destination: Path, dry_run: bool, verbose: bool, skip_fil
             preview_changes(photos_to_paths, source, destination, audit_file=audit_file)
             print("Dry-run complete. Use without --dry-run to actually move/copy files.")
         else:
+            # Generate preview file and wait for user confirmation
+            operation = "copied" if copy else "moved"
+            # Create preview file in destination directory (create directory if needed)
+            destination.mkdir(parents=True, exist_ok=True)
+            preview_file = destination / "PREVIEW_FILE.txt"
+
+            print(f"\nGenerating preview file: {preview_file}")
+            if not write_preview_file(photos_to_paths, source, destination, preview_file, operation):
+                print("ERROR: Failed to generate preview file. Aborting.")
+                sys.exit(1)
+
+            if not confirm_proceed(preview_file, copy):
+                print("\nOperation cancelled by user.")
+                sys.exit(0)
+
+            print("\nProceeding with file operation...\n")
             # Step 7: Move or copy files
             operation = "copying" if copy else "moving"
             print(f"Step 7: {operation.capitalize()} files to destination...")
